@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 let Http = axios.create({
-    baseURL: '/',
+    baseURL: '/api',
 });
 
 // // 添加一个请求拦截器

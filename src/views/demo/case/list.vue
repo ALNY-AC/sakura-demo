@@ -1,27 +1,19 @@
 <template>
     <div>
-        <el-card>
+        <el-card shadow="never">
             <el-form ref="queryForm" inline :model="query">
+                <!-- 
+                    搜索条件规范：
+                    1、最常用的默认展现，且在前面
+                    2、不常用的默认不展现，且靠后排列
+                    3、在是否常用的前提下，注意表单视觉上和用户交互上的顺序，比如和输入框类似的放在一起，下拉框放在一起等，让用户可以延续自己的行为暂留
+                -->
                 <el-form-item label="关键字：" prop="name">
-                    <el-input v-model="query.name" @keydown.enter.native="updateInit()"></el-input>
-                </el-form-item>
-
-                <el-form-item label="上下架：" prop="name">
-                    <el-radio-group @change="updateInit()" v-model="query.is_show">
-                        <el-radio :label="0">上架</el-radio>
-                        <el-radio :label="1">下架</el-radio>
-                    </el-radio-group>
-                </el-form-item>
-
-                <el-form-item label="类型：" prop="name">
-                    <el-select @change="updateInit()" filterable v-model="query.type" placeholder="请选择">
-                        <el-option v-for="item in types" :key="item.id" :label="item.name" :value="item.id">
-                        </el-option>
-                    </el-select>
+                    <el-input style="width:200px" @keydown.enter.native="updateInit()" v-model="query.name" clearable></el-input>
                 </el-form-item>
 
                 <el-form-item label="状态：" prop="name">
-                    <el-select @change="updateInit()" multiple v-model="query.state" placeholder="请选择">
+                    <el-select @change="updateInit()" v-model="query.state" placeholder="请选择" clearable multiple>
                         <el-option label="待审核" :value="1"></el-option>
                         <el-option label="待发布" :value="2"></el-option>
                         <el-option label="已发布" :value="3"></el-option>
@@ -29,21 +21,55 @@
                     </el-select>
                 </el-form-item>
 
-                <el-form-item label="时间：">
-                    <el-date-picker @change="updateInit()" value-format="yyyy-MM-dd HH:mm:ss" v-model="time" type="datetimerange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期"></el-date-picker>
-                </el-form-item>
+                <template v-if="isShowAllForm">
+
+                    <el-form-item label="类型：" prop="name">
+                        <el-select @change="updateInit()" v-model="query.type" placeholder="请选择" clearable filterable>
+                            <el-option v-for="item in types" :key="item.id" :label="item.name" :value="item.id">
+                            </el-option>
+                        </el-select>
+                    </el-form-item>
+
+                    <el-form-item label="时间：">
+                        <el-date-picker @change="updateInit()" v-model="time" clearable value-format="yyyy-MM-dd HH:mm:ss" type="datetimerange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期"></el-date-picker>
+                    </el-form-item>
+                    <el-form-item label="上下架：" prop="name">
+                        <el-radio-group @change="updateInit()" v-model="query.is_show">
+                            <el-radio :label="0">上架</el-radio>
+                            <el-radio :label="1">下架</el-radio>
+                        </el-radio-group>
+                    </el-form-item>
+
+                </template>
 
                 <el-form-item>
                     <el-button @click="updateInit()">搜索</el-button>
                     <el-button @click="$refs.queryForm.resetFields();time=[];updateInit()">重置</el-button>
+                    <el-button type="text" @click="isShowAllForm=!isShowAllForm">{{!isShowAllForm?'展开搜索':'收起搜索'}}
+                        <i :class="!isShowAllForm?'el-icon-arrow-down':'el-icon-arrow-up'"></i>
+                    </el-button>
                 </el-form-item>
+
             </el-form>
+
             <el-form ref="toolForm" inline>
-                <el-form-item label>
+                <el-form-item>
                     <el-button type="primary" icon="el-icon-plus" @click="$router.push('/')">新增</el-button>
-                    <el-button type="primary" @click="saveShow(selectList.map(el=>el.id),1)">批量操作</el-button>
-                    <el-button type="primary" @click="saveShow(selectList.map(el=>el.id),0)">批量下架</el-button>
-                    <el-button type="primary" @click="del(selectList.map(el=>el.id))">批量删除</el-button>
+                </el-form-item>
+                <el-form-item>
+                    <el-dropdown trigger="click">
+                        <el-button type="primary">
+                            批量上架/下架
+                            <i class="el-icon-arrow-down el-icon--right"></i>
+                        </el-button>
+                        <el-dropdown-menu slot="dropdown">
+                            <el-dropdown-item @click.native.stop="saveShow(selectList.map(el=>el.id),1)">批量上架</el-dropdown-item>
+                            <el-dropdown-item @click.native.stop="saveShow(selectList.map(el=>el.id),0)">批量下架</el-dropdown-item>
+                        </el-dropdown-menu>
+                    </el-dropdown>
+                </el-form-item>
+                <el-form-item>
+                    <el-button type="danger" icon="el-icon-delete" @click="del(selectList.map(el=>el.id))">批量删除</el-button>
                 </el-form-item>
             </el-form>
 
@@ -51,9 +77,10 @@
                 <el-table-column reserve-selection width="55" align="center" type="selection"></el-table-column>
                 <el-table-column prop="id" align="center" width="55" label="#"></el-table-column>
                 <el-table-column prop="title" align="left" width="200" label="标题" show-overflow-tooltip></el-table-column>
-                <!-- 用作撑开，如果不需要，可以删除 -->
+                <!-- 下面代码用作撑开表格空元素，如果不需要，可以删除 -->
+                <!-- <el-table-column></el-table-column> -->
 
-                <el-table-column prop="state">
+                <el-table-column prop="state" label="状态">
                     <template slot-scope="scope">
                         <FlowTool v-model="scope.row.state" @change="save(scope.row)" :option="[
                         {label:'待审核',value:1,type:'info'},
@@ -66,6 +93,7 @@
                     </template>
                 </el-table-column>
 
+                <el-table-column prop="add_time" align="left" width="150" label="创建时间" show-overflow-tooltip></el-table-column>
                 <el-table-column prop="is_show" align="center" width="80" label="上下架">
                     <template slot-scope="scope">
                         <el-switch :active-value="1" :inactive-value="0" v-model="scope.row.is_show" @change="saveShow([scope.row.id],scope.row.is_show)"></el-switch>
@@ -89,6 +117,7 @@ export default {
         return {
             time: [],
             types: [],
+            isShowAllForm: false,
             //查询参数
             query: {
                 page: 1,
@@ -136,18 +165,18 @@ export default {
         async save(row) {
             console.warn('要保存的数据：');
             console.warn(row);
+            try {
+                const res = await this.$http.post('/save', { ids: ids });
+                if (res.code >= 0) {
+                    this.$message.success('操作成功！');
+                } else {
+                    throw (res);
+                }
+            } catch (e) {
+                this.$message.error('操作失败！');
+                console.error(e);
+            }
             this.update();
-            // try {
-            //     const res = await this.$http.post('', { ids: ids });
-            //     if (res.code >= 0) {
-            //         this.$message.success('操作成功！');
-            //     } else {
-            //         throw (res);
-            //     }
-            // } catch (e) {
-            //     this.$message.error('操作失败！');
-            //     console.error(e);
-            // }
         },
         async saveShow(ids = [], is_show) {
             console.warn('要保存的id：', ids);
@@ -193,10 +222,10 @@ export default {
                 this.$message.error('操作失败！');
                 console.error(e);
             }
-            this.updateInit();
+            this.update();
         },
-        update() {
-            this.httpList();
+        async update() {
+            await this.httpList();
         },
         async httpList() {
             this.loading = true;
@@ -207,7 +236,13 @@ export default {
                 this.total = 200;
                 this.list = new Array(this.total)
                     .fill("")
-                    .map((el, i) => ({ id: i, title: `测试数据${i}`, state: 1, is_show: 1 })).splice((this.query.page - 1) * this.query.size, this.query.size);
+                    .map((el, i) => ({
+                        id: i,
+                        title: `测试数据${i}`,
+                        state: 1,
+                        is_show: 1,
+                        add_time: new Date().Format("yyyy-MM-dd hh:mm:ss")
+                    })).splice((this.query.page - 1) * this.query.size, this.query.size);
             }, 500);
             // try {
             //     const res = await this.$http.post('', this.query);
